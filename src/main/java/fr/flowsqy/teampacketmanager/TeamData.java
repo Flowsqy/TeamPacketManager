@@ -1,6 +1,6 @@
 package fr.flowsqy.teampacketmanager;
 
-import org.bukkit.Color;
+import org.bukkit.ChatColor;
 
 import java.util.Objects;
 
@@ -12,12 +12,13 @@ public class TeamData {
     private String suffix;
     private NameTagVisibility nameTagVisibility;
     private CollisionRules collisionRules;
-    private Color color;
+    private ChatColor color;
+    private Option option;
 
     public TeamData() {
     }
 
-    public TeamData(String id, String displayName, String prefix, String suffix, NameTagVisibility nameTagVisibility, CollisionRules collisionRules, Color color) {
+    public TeamData(String id, String displayName, String prefix, String suffix, NameTagVisibility nameTagVisibility, CollisionRules collisionRules, ChatColor color, Option option) {
         this.id = id;
         this.displayName = displayName;
         this.prefix = prefix;
@@ -25,6 +26,7 @@ public class TeamData {
         this.nameTagVisibility = nameTagVisibility;
         this.collisionRules = collisionRules;
         this.color = color;
+        this.option = option;
     }
 
     public String getId() {
@@ -75,12 +77,20 @@ public class TeamData {
         this.collisionRules = collisionRules;
     }
 
-    public Color getColor() {
+    public ChatColor getColor() {
         return color;
     }
 
-    public void setColor(Color color) {
+    public void setColor(ChatColor color) {
         this.color = color;
+    }
+
+    public Option getOption() {
+        return option;
+    }
+
+    public void setOption(Option option) {
+        this.option = option;
     }
 
     @Override
@@ -88,12 +98,12 @@ public class TeamData {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         TeamData teamData = (TeamData) o;
-        return Objects.equals(id, teamData.id) && Objects.equals(displayName, teamData.displayName) && Objects.equals(prefix, teamData.prefix) && Objects.equals(suffix, teamData.suffix) && nameTagVisibility == teamData.nameTagVisibility && collisionRules == teamData.collisionRules && Objects.equals(color, teamData.color);
+        return Objects.equals(id, teamData.id) && Objects.equals(displayName, teamData.displayName) && Objects.equals(prefix, teamData.prefix) && Objects.equals(suffix, teamData.suffix) && nameTagVisibility == teamData.nameTagVisibility && collisionRules == teamData.collisionRules && color == teamData.color && Objects.equals(option, teamData.option);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, displayName, prefix, suffix, nameTagVisibility, collisionRules, color);
+        return Objects.hash(id, displayName, prefix, suffix, nameTagVisibility, collisionRules, color, option);
     }
 
     @Override
@@ -106,6 +116,7 @@ public class TeamData {
                 ", nameTagVisibility=" + nameTagVisibility +
                 ", collisionRules=" + collisionRules +
                 ", color=" + color +
+                ", option=" + option +
                 '}';
     }
 
@@ -117,7 +128,8 @@ public class TeamData {
         private String suffix;
         private NameTagVisibility nameTagVisibility;
         private CollisionRules collisionRules;
-        private Color color;
+        private ChatColor color;
+        private Option option;
 
         public Builder() {
         }
@@ -176,12 +188,21 @@ public class TeamData {
             return this;
         }
 
-        public Color color() {
+        public ChatColor color() {
             return color;
         }
 
-        public Builder color(Color color) {
+        public Builder color(ChatColor color) {
             this.color = color;
+            return this;
+        }
+
+        public Option option() {
+            return option;
+        }
+
+        public Builder option(Option option) {
+            this.option = option;
             return this;
         }
 
@@ -193,7 +214,8 @@ public class TeamData {
                     suffix,
                     nameTagVisibility,
                     collisionRules,
-                    color
+                    color,
+                    option
             );
         }
 
