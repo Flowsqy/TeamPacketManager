@@ -85,12 +85,10 @@ public class TeamPacketManager implements Listener {
 
             private final Object playerConnection;
             private final Iterator<Map.Entry<String, TeamData>> entryIterator;
-            private final List<String> playerList;
 
             {
                 playerConnection = TeamPacketSender.getPlayerConnection(event.getPlayer());
                 entryIterator = data.entrySet().iterator();
-                playerList = new ArrayList<>(Collections.singletonList(event.getPlayer().getName()));
             }
 
             @Override
@@ -104,7 +102,7 @@ public class TeamPacketManager implements Listener {
                         TeamPacketSender.sendPacket(playerConnection,
                                 TeamPacketSender.getPacket(
                                         entry.getValue(),
-                                        playerList,
+                                        new ArrayList<>(Collections.singletonList(entry.getKey())),
                                         TeamPacketSender.Method.CREATE
                                 )
                                 );
