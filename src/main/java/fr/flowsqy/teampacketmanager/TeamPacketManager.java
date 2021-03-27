@@ -94,6 +94,8 @@ public class TeamPacketManager implements Listener {
     }
 
     public TeamData applyTeamData(Player player, TeamData teamData){
+        if(locked)
+            return null;
         if(player == null)
             return null;
         final String playerName = player.getName();
@@ -126,6 +128,8 @@ public class TeamPacketManager implements Listener {
 
     public TeamData removeTeamData(String player){
         final TeamData teamData = data.remove(player);
+        if(locked)
+            return teamData;
         if(teamData != null && !teamData.getId().equals(TeamData.DEFAULT_TEAM_ID)){
             removeTeam(teamData.getId());
         }
@@ -148,6 +152,8 @@ public class TeamPacketManager implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     private void onJoin(PlayerJoinEvent event) throws ReflectiveOperationException {
+        if(locked)
+            return;
         new BukkitRunnable() {
 
             private final Object playerConnection;
