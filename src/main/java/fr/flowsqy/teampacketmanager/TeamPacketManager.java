@@ -20,10 +20,77 @@ public class TeamPacketManager implements Listener {
     private final Plugin plugin;
     private final Map<String, TeamData> data;
 
+    private boolean locked;
+
     public TeamPacketManager(Plugin plugin) {
         data = new HashMap<>();
         this.plugin = plugin;
         Bukkit.getPluginManager().registerEvents(this, plugin);
+    }
+
+    public boolean isLocked() {
+        return locked;
+    }
+
+    public void setLocked(boolean locked) {
+        if(this.locked == locked)
+            return;
+        this.locked = locked;
+        if(locked){
+            new BukkitRunnable() {
+
+                private final Iterator<Map.Entry<String, TeamData>> entryIterator;
+
+                {
+                    entryIterator = data.entrySet().iterator();
+                }
+
+                @Override
+                public void run() {
+                    int packetCount = 1;
+                    while(entryIterator.hasNext()){
+                        if(packetCount > PACKET_BY_TICKS)
+                            return;
+                        final Map.Entry<String, TeamData> entry = entryIterator.next();
+                        TeamPacketSender.sendTeamData(
+                                Bukkit.getOnlinePlayers(),
+                                new TeamData.Builder().id(entry.getValue().getId()).create(),
+                                Collections.emptyList(),
+                                TeamPacketSender.Method.REMOVE
+                        );
+                        packetCount++;
+                    }
+                    cancel();
+                }
+            }.runTaskTimer(plugin, 0L, INTERVAL_PACKET_SENT);
+        } else {
+            new BukkitRunnable() {
+
+                private final Iterator<Map.Entry<String, TeamData>> entryIterator;
+
+                {
+                    entryIterator = data.entrySet().iterator();
+                }
+
+                @Override
+                public void run() {
+                    int packetCount = 1;
+                    while(entryIterator.hasNext()){
+                        if(packetCount > PACKET_BY_TICKS)
+                            return;
+                        final Map.Entry<String, TeamData> entry = entryIterator.next();
+                        TeamPacketSender.sendTeamData(
+                                Bukkit.getOnlinePlayers(),
+                                entry.getValue(),
+                                new ArrayList<>(Collections.singletonList(entry.getKey())),
+                                TeamPacketSender.Method.CREATE
+                        );
+                        packetCount++;
+                    }
+                    cancel();
+                }
+            }.runTaskTimer(plugin, 0L, INTERVAL_PACKET_SENT);
+        }
     }
 
     public TeamData applyTeamData(Player player, TeamData teamData){
