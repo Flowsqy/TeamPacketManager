@@ -250,8 +250,7 @@ public class TeamPacketSender {
         Objects.requireNonNull(option);
 
         try{
-            sendPacket(
-                    receivers,
+            final Object packet = getPacket(
                     name,
                     chatComponentTextConstructor.newInstance(displayName),
                     chatComponentTextConstructor.newInstance(prefix),
@@ -263,6 +262,7 @@ public class TeamPacketSender {
                     method.getMethod(),
                     option.getPackedOption()
             );
+            sendPacketTo(receivers, packet);
         }catch (ReflectiveOperationException e){
             throw new RuntimeException("Can not send team information", e);
         }
@@ -280,27 +280,42 @@ public class TeamPacketSender {
         if(teamData == null || teamData.getId() == null)
             return false;
         try{
-            sendPacket(
-                    receivers,
-                    teamData.getId(),
-                    teamData.getDisplayName() == null ? emptyChatComponentText : chatComponentTextConstructor.newInstance(teamData.getDisplayName()),
-                    teamData.getPrefix() == null ? emptyChatComponentText : chatComponentTextConstructor.newInstance(teamData.getPrefix()),
-                    teamData.getSuffix() == null ? emptyChatComponentText : chatComponentTextConstructor.newInstance(teamData.getSuffix()),
-                    (teamData.getNameTagVisibility() == null ? NameTagVisibility.ALWAYS : teamData.getNameTagVisibility()).getVisibility(),
-                    (teamData.getCollisionRules() == null ? CollisionRules.ALWAYS : teamData.getCollisionRules()).getRule(),
-                    getColor(teamData.getColor() == null ? ChatColor.RESET : teamData.getColor()),
-                    players,
-                    method.getMethod(),
-                    (teamData.getOption() == null ? new Option() : teamData.getOption()).getPackedOption()
-            );
+            sendPacketTo(receivers, getPacket(teamData, players, method));
             return true;
         }catch (ReflectiveOperationException e){
             return false;
         }
     }
 
-    private static void sendPacket (
-            Iterable<? extends Player> receivers,
+    public static void sendPacketTo(Iterable<? extends Player> receivers, Object packet) throws ReflectiveOperationException {
+        for (Player player : receivers)
+            sendPacketMethod.invoke(getPlayerConnection(player), packet);
+    }
+
+    public static Object getPlayerConnection(Player player) throws ReflectiveOperationException {
+        return playerConnectionField.get(getHandlePlayerMethod.invoke(player));
+    }
+
+    public static void sendPacket(Object playerConnection, Object packet) throws ReflectiveOperationException {
+        sendPacketMethod.invoke(playerConnection, packet);
+    }
+
+    public static Object getPacket(TeamData teamData, Collection<String> players, Method method) throws ReflectiveOperationException{
+        return getPacket(
+                teamData.getId(),
+                teamData.getDisplayName() == null ? emptyChatComponentText : chatComponentTextConstructor.newInstance(teamData.getDisplayName()),
+                teamData.getPrefix() == null ? emptyChatComponentText : chatComponentTextConstructor.newInstance(teamData.getPrefix()),
+                teamData.getSuffix() == null ? emptyChatComponentText : chatComponentTextConstructor.newInstance(teamData.getSuffix()),
+                (teamData.getNameTagVisibility() == null ? NameTagVisibility.ALWAYS : teamData.getNameTagVisibility()).getVisibility(),
+                (teamData.getCollisionRules() == null ? CollisionRules.ALWAYS : teamData.getCollisionRules()).getRule(),
+                getColor(teamData.getColor() == null ? ChatColor.RESET : teamData.getColor()),
+                players,
+                method.getMethod(),
+                (teamData.getOption() == null ? new Option() : teamData.getOption()).getPackedOption()
+        );
+    }
+
+    public static Object getPacket (
             String name,
             Object displayName,
             Object prefix,
@@ -326,10 +341,7 @@ public class TeamPacketSender {
         methodField.set(packet, method);
         optionField.set(packet, option);
 
-        for(Player receiver : receivers){
-            sendPacketMethod.invoke(playerConnectionField.get(getHandlePlayerMethod.invoke(receiver)), packet);
-        }
-
+        return packet;
     }
 
     /**

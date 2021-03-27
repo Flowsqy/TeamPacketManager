@@ -8,15 +8,21 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.*;
 
 public class TeamPacketManager implements Listener {
 
+    private final static int PACKET_BY_TICKS = 10;
+    private final static int INTERVAL_PACKET_SENT = 4;
+
+    private final Plugin plugin;
     private final Map<String, TeamData> data;
 
     public TeamPacketManager(Plugin plugin) {
         data = new HashMap<>();
+        this.plugin = plugin;
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
@@ -74,8 +80,42 @@ public class TeamPacketManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    private void onJoin(PlayerJoinEvent event){
+    private void onJoin(PlayerJoinEvent event) throws ReflectiveOperationException {
+        new BukkitRunnable() {
 
+            private final Object playerConnection;
+            private final Iterator<Map.Entry<String, TeamData>> entryIterator;
+            private final List<String> playerList;
+
+            {
+                playerConnection = TeamPacketSender.getPlayerConnection(event.getPlayer());
+                entryIterator = data.entrySet().iterator();
+                playerList = new ArrayList<>(Collections.singletonList(event.getPlayer().getName()));
+            }
+
+            @Override
+            public void run() {
+                int packetCount = 1;
+                while(entryIterator.hasNext()){
+                    if(packetCount > PACKET_BY_TICKS)
+                        return;
+                    final Map.Entry<String, TeamData> entry = entryIterator.next();
+                    try {
+                        TeamPacketSender.sendPacket(playerConnection,
+                                TeamPacketSender.getPacket(
+                                        entry.getValue(),
+                                        playerList,
+                                        TeamPacketSender.Method.CREATE
+                                )
+                                );
+                    } catch (ReflectiveOperationException e) {
+                        e.printStackTrace();
+                    }
+                    packetCount++;
+                }
+                cancel();
+            }
+        }.runTaskTimer(plugin, 0L, INTERVAL_PACKET_SENT);
     }
 
 }
