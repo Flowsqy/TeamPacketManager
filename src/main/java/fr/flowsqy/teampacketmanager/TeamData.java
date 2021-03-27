@@ -105,6 +105,35 @@ public class TeamData {
         this.option = option;
     }
 
+    public TeamData merge(TeamData teamData) {
+        return new TeamData(
+                mergeData(id, teamData.id, this::setId, DEFAULT_TEAM_ID),
+                mergeData(displayName, teamData.displayName, this::setDisplayName),
+                mergeData(prefix, teamData.prefix, this::setPrefix),
+                mergeData(suffix, teamData.suffix, this::setSuffix),
+                mergeData(nameTagVisibility, teamData.nameTagVisibility, this::setNameTagVisibility),
+                mergeData(collisionRules, teamData.collisionRules, this::setCollisionRules),
+                mergeData(color, teamData.color, this::setColor),
+                mergeData(option, teamData.option, this::setOption)
+        );
+    }
+
+    private <T> T mergeData(T current, T newer, Consumer<T> setter){
+        return mergeData(current, newer, setter, null);
+    }
+
+    private <T> T mergeData(T current, T newer, Consumer<T> setter, T defaultValue){
+        if(current == null){
+            if(newer != null)
+                setter.accept(newer);
+            return defaultValue;
+        }
+        if(current.equals(newer))
+            return defaultValue;
+        setter.accept(newer);
+        return current;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
