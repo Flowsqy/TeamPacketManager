@@ -2,4 +2,4 @@ name: TeamPacketManager
 author: Flowsqy
 version: ${project.version}
 main: fr.flowsqy.teampacketmanager.TeamPacketManagerPlugin
-api-version: "1.16"
+api-version: "1.13"
