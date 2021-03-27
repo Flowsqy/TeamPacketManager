@@ -3,8 +3,11 @@ package fr.flowsqy.teampacketmanager;
 import org.bukkit.ChatColor;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 
 public class TeamData {
+
+    public final static String DEFAULT_TEAM_ID = "NULL";
 
     private String id;
     private String displayName;
@@ -15,10 +18,13 @@ public class TeamData {
     private ChatColor color;
     private Option option;
 
-    public TeamData() {
+    public TeamData(String id) {
+        checkId(id);
+        this.id = id;
     }
 
     public TeamData(String id, String displayName, String prefix, String suffix, NameTagVisibility nameTagVisibility, CollisionRules collisionRules, ChatColor color, Option option) {
+        checkId(id);
         this.id = id;
         this.displayName = displayName;
         this.prefix = prefix;
@@ -34,7 +40,13 @@ public class TeamData {
     }
 
     public void setId(String id) {
+        checkId(id);
         this.id = id;
+    }
+
+    private void checkId(String id){
+        if (id == null || id.isEmpty())
+            throw new UnsupportedOperationException("You can not set a null or empty team id");
     }
 
     public String getDisplayName() {
@@ -98,7 +110,7 @@ public class TeamData {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         TeamData teamData = (TeamData) o;
-        return Objects.equals(id, teamData.id) && Objects.equals(displayName, teamData.displayName) && Objects.equals(prefix, teamData.prefix) && Objects.equals(suffix, teamData.suffix) && nameTagVisibility == teamData.nameTagVisibility && collisionRules == teamData.collisionRules && color == teamData.color && Objects.equals(option, teamData.option);
+        return id.equals(teamData.id) && Objects.equals(displayName, teamData.displayName) && Objects.equals(prefix, teamData.prefix) && Objects.equals(suffix, teamData.suffix) && nameTagVisibility == teamData.nameTagVisibility && collisionRules == teamData.collisionRules && color == teamData.color && Objects.equals(option, teamData.option);
     }
 
     @Override
@@ -206,7 +218,7 @@ public class TeamData {
             return this;
         }
 
-        private TeamData create(){
+        public TeamData create(){
             return new TeamData(
                     id,
                     displayName,
