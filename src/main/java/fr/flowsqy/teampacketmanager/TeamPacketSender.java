@@ -25,6 +25,7 @@ public class TeamPacketSender {
     private static final Field optionField;
 
     private static final Constructor<?> chatComponentTextConstructor;
+    private static final Object emptyChatComponentText;
 
     private static final java.lang.reflect.Method getHandlePlayerMethod;
     private static final Field playerConnectionField;
@@ -77,6 +78,9 @@ public class TeamPacketSender {
 
             final Class<?> chatComponentTextClass = Class.forName(nms+"ChatComponentText");
             chatComponentTextConstructor = chatComponentTextClass.getDeclaredConstructor(String.class);
+            final Field emptyChatComponentTextField = chatComponentTextClass.getDeclaredField("d");
+            emptyChatComponentTextField.setAccessible(true);
+            emptyChatComponentText = emptyChatComponentTextField.get(null);
 
             final Class<?> craftPlayerClass = Class.forName("org.bukkit.craftbukkit."+versionName+".entity.CraftPlayer");
             getHandlePlayerMethod = craftPlayerClass.getDeclaredMethod("getHandle");
@@ -221,7 +225,7 @@ public class TeamPacketSender {
      * @param option Other options
      */
     public static void sendTeamInfo(
-            Iterable<Player> receivers,
+            Iterable<? extends Player> receivers,
             String name,
             String displayName,
             String prefix,
@@ -249,9 +253,9 @@ public class TeamPacketSender {
             sendPacket(
                     receivers,
                     name,
-                    displayName,
-                    prefix,
-                    suffix,
+                    chatComponentTextConstructor.newInstance(displayName),
+                    chatComponentTextConstructor.newInstance(prefix),
+                    chatComponentTextConstructor.newInstance(suffix),
                     nameTagVisibility.getVisibility(),
                     collisionRules.getRule(),
                     getColor(color),
@@ -264,12 +268,43 @@ public class TeamPacketSender {
         }
     }
 
+    /**
+     * Method that send a TeamData object
+     * @param receivers The players that will receive the information
+     * @param teamData The team data to send
+     * @param players The players in the team
+     * @param method The method for information interpretation clientside
+     * @return true if the TeamData is correctly sent, false otherwise
+     */
+    public static boolean sendTeamData(Iterable<? extends Player> receivers, TeamData teamData, Collection<String> players, Method method){
+        if(teamData == null || teamData.getId() == null)
+            return false;
+        try{
+            sendPacket(
+                    receivers,
+                    teamData.getId(),
+                    teamData.getDisplayName() == null ? emptyChatComponentText : chatComponentTextConstructor.newInstance(teamData.getDisplayName()),
+                    teamData.getPrefix() == null ? emptyChatComponentText : chatComponentTextConstructor.newInstance(teamData.getPrefix()),
+                    teamData.getSuffix() == null ? emptyChatComponentText : chatComponentTextConstructor.newInstance(teamData.getSuffix()),
+                    (teamData.getNameTagVisibility() == null ? NameTagVisibility.ALWAYS : teamData.getNameTagVisibility()).getVisibility(),
+                    (teamData.getCollisionRules() == null ? CollisionRules.ALWAYS : teamData.getCollisionRules()).getRule(),
+                    getColor(teamData.getColor() == null ? ChatColor.RESET : teamData.getColor()),
+                    players,
+                    method.getMethod(),
+                    (teamData.getOption() == null ? new Option() : teamData.getOption()).getPackedOption()
+            );
+            return true;
+        }catch (ReflectiveOperationException e){
+            return false;
+        }
+    }
+
     private static void sendPacket (
-            Iterable<Player> receivers,
+            Iterable<? extends Player> receivers,
             String name,
-            String displayName,
-            String prefix,
-            String suffix,
+            Object displayName,
+            Object prefix,
+            Object suffix,
             String nameTagVisibility,
             String collisionRules,
             Object color,
@@ -281,9 +316,9 @@ public class TeamPacketSender {
         final Object packet = packetPlayOutScoreboardTeamConstructor.newInstance();
 
         nameField.set(packet, name);
-        displayNameField.set(packet, chatComponentTextConstructor.newInstance(displayName));
-        prefixField.set(packet, chatComponentTextConstructor.newInstance(prefix));
-        suffixField.set(packet, chatComponentTextConstructor.newInstance(suffix));
+        displayNameField.set(packet, displayName);
+        prefixField.set(packet, prefix);
+        suffixField.set(packet, suffix);
         nameTagVisibilityField.set(packet, nameTagVisibility);
         collisionRuleField.set(packet, collisionRules);
         colorField.set(packet, color);
