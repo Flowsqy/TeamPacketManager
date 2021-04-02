@@ -15,18 +15,28 @@ import java.util.*;
 
 public class TeamPacketManager implements Listener {
 
-    private final static int PACKET_BY_TICKS = 10;
-    private final static int INTERVAL_PACKET_SENT = 4;
+    private final int PACKET_BY_TICKS;
+    private final int INTERVAL_PACKET_SENT;
 
     private final Plugin plugin;
     private final Map<String, TeamData> data;
 
     private boolean locked;
 
-    public TeamPacketManager(Plugin plugin) {
-        data = new HashMap<>();
+    public TeamPacketManager(TeamPacketManagerPlugin plugin) {
+        PACKET_BY_TICKS = clamp(plugin.getConfiguration().getInt("packets-by-ticks", 10), Integer.MAX_VALUE, 1);
+        INTERVAL_PACKET_SENT = clamp(plugin.getConfiguration().getInt("interval-packet-sent", 4), 20, 1);
         this.plugin = plugin;
+        data = new HashMap<>();
         Bukkit.getPluginManager().registerEvents(this, plugin);
+    }
+
+    private static int clamp(int value, int max, int min) {
+        if (max > value)
+            return max;
+        if (min < value)
+            return min;
+        return value;
     }
 
     public boolean isLocked() {
