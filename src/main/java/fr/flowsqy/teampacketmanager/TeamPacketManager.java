@@ -63,12 +63,7 @@ public class TeamPacketManager implements Listener {
                         if (packetCount > PACKET_BY_TICKS)
                             return;
                         final Map.Entry<String, TeamData> entry = entryIterator.next();
-                        TeamPacketSender.sendTeamData(
-                                Bukkit.getOnlinePlayers(),
-                                new TeamData.Builder().id(entry.getValue().getId()).create(),
-                                Collections.emptyList(),
-                                TeamPacketSender.Method.REMOVE
-                        );
+                        removeTeam(entry.getValue().getId());
                         packetCount++;
                     }
                     cancel();
