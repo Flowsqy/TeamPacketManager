@@ -1,4 +1,4 @@
-package fr.flowsqy.teampacketmanager;
+package fr.flowsqy.teampacketmanager.commons;
 
 /**
  * How players of this team collide with others

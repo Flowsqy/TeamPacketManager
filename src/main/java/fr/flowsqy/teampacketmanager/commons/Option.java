@@ -1,4 +1,4 @@
-package fr.flowsqy.teampacketmanager;
+package fr.flowsqy.teampacketmanager.commons;
 
 import java.util.Objects;
 
@@ -20,6 +20,7 @@ public final class Option {
 
     /**
      * Gets the team friendly fire state
+     *
      * @return true if friendly fire is enabled
      */
     public boolean isAllowFriendlyFire() {
@@ -28,6 +29,7 @@ public final class Option {
 
     /**
      * Sets the team friendly fire state
+     *
      * @param allowFriendlyFire true if friendly fire is to be allowed
      */
     public void setAllowFriendlyFire(boolean allowFriendlyFire) {
@@ -36,6 +38,7 @@ public final class Option {
 
     /**
      * Gets the team's ability to see invisible teammates
+     *
      * @return true if team members can see invisible members
      */
     public boolean isCanSeeFriendlyInvisible() {
@@ -44,13 +47,14 @@ public final class Option {
 
     /**
      * Sets the team's ability to see invisible teammates
+     *
      * @param canSeeFriendlyInvisible true if invisible teammates are to be visible
      */
     public void setCanSeeFriendlyInvisible(boolean canSeeFriendlyInvisible) {
         this.canSeeFriendlyInvisible = canSeeFriendlyInvisible;
     }
 
-    public int getPackedOption(){
+    public int getPackedOption() {
         int options = 0;
         if (allowFriendlyFire)
             options |= 1;

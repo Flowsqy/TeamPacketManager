@@ -1,4 +1,4 @@
-package fr.flowsqy.teampacketmanager;
+package fr.flowsqy.teampacketmanager.commons;
 
 import org.bukkit.ChatColor;
 
@@ -44,7 +44,7 @@ public class TeamData {
         this.id = id;
     }
 
-    private void checkId(String id){
+    private void checkId(String id) {
         if (id == null || id.isEmpty())
             throw new UnsupportedOperationException("You can not set a null or empty team id");
     }
@@ -118,17 +118,17 @@ public class TeamData {
         );
     }
 
-    private <T> T mergeData(T current, T newer, Consumer<T> setter){
+    private <T> T mergeData(T current, T newer, Consumer<T> setter) {
         return mergeData(current, newer, setter, null);
     }
 
-    private <T> T mergeData(T current, T newer, Consumer<T> setter, T defaultValue){
-        if(current == null){
-            if(newer != null)
+    private <T> T mergeData(T current, T newer, Consumer<T> setter, T defaultValue) {
+        if (current == null) {
+            if (newer != null)
                 setter.accept(newer);
             return defaultValue;
         }
-        if(current.equals(newer))
+        if (current.equals(newer))
             return defaultValue;
         setter.accept(newer);
         return current;
@@ -247,7 +247,7 @@ public class TeamData {
             return this;
         }
 
-        public TeamData create(){
+        public TeamData create() {
             return new TeamData(
                     id,
                     displayName,

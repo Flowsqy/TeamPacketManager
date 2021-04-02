@@ -1,5 +1,6 @@
 package fr.flowsqy.teampacketmanager;
 
+import fr.flowsqy.teampacketmanager.commons.TeamData;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -33,10 +34,10 @@ public class TeamPacketManager implements Listener {
     }
 
     public void setLocked(boolean locked) {
-        if(this.locked == locked)
+        if (this.locked == locked)
             return;
         this.locked = locked;
-        if(locked){
+        if (locked) {
             new BukkitRunnable() {
 
                 private final Iterator<Map.Entry<String, TeamData>> entryIterator;
@@ -48,8 +49,8 @@ public class TeamPacketManager implements Listener {
                 @Override
                 public void run() {
                     int packetCount = 1;
-                    while(entryIterator.hasNext()){
-                        if(packetCount > PACKET_BY_TICKS)
+                    while (entryIterator.hasNext()) {
+                        if (packetCount > PACKET_BY_TICKS)
                             return;
                         final Map.Entry<String, TeamData> entry = entryIterator.next();
                         TeamPacketSender.sendTeamData(
@@ -75,8 +76,8 @@ public class TeamPacketManager implements Listener {
                 @Override
                 public void run() {
                     int packetCount = 1;
-                    while(entryIterator.hasNext()){
-                        if(packetCount > PACKET_BY_TICKS)
+                    while (entryIterator.hasNext()) {
+                        if (packetCount > PACKET_BY_TICKS)
                             return;
                         final Map.Entry<String, TeamData> entry = entryIterator.next();
                         TeamPacketSender.sendTeamData(
@@ -93,16 +94,16 @@ public class TeamPacketManager implements Listener {
         }
     }
 
-    public TeamData applyTeamData(Player player, TeamData teamData){
-        if(locked)
+    public TeamData applyTeamData(Player player, TeamData teamData) {
+        if (locked)
             return null;
-        if(player == null)
+        if (player == null)
             return null;
         final String playerName = player.getName();
         final TeamData previousData = data.get(playerName);
-        if(teamData == null)
+        if (teamData == null)
             return previousData;
-        if(previousData == null){
+        if (previousData == null) {
             data.put(playerName, teamData);
             TeamPacketSender.sendTeamData(
                     Bukkit.getOnlinePlayers(),
@@ -114,7 +115,7 @@ public class TeamPacketManager implements Listener {
         }
         final TeamData conflictData = previousData.merge(teamData);
         final boolean changeName = !conflictData.getId().equals(TeamData.DEFAULT_TEAM_ID);
-        if(changeName){
+        if (changeName) {
             removeTeam(conflictData.getId());
         }
         TeamPacketSender.sendTeamData(
@@ -126,17 +127,17 @@ public class TeamPacketManager implements Listener {
         return conflictData;
     }
 
-    public TeamData removeTeamData(String player){
+    public TeamData removeTeamData(String player) {
         final TeamData teamData = data.remove(player);
-        if(locked)
+        if (locked)
             return teamData;
-        if(teamData != null && !teamData.getId().equals(TeamData.DEFAULT_TEAM_ID)){
+        if (teamData != null && !teamData.getId().equals(TeamData.DEFAULT_TEAM_ID)) {
             removeTeam(teamData.getId());
         }
         return teamData;
     }
 
-    private void removeTeam(String id){
+    private void removeTeam(String id) {
         TeamPacketSender.sendTeamData(
                 Bukkit.getOnlinePlayers(),
                 new TeamData(id),
@@ -146,13 +147,13 @@ public class TeamPacketManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    private void onQuit(PlayerQuitEvent event){
+    private void onQuit(PlayerQuitEvent event) {
         removeTeamData(event.getPlayer().getName());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     private void onJoin(PlayerJoinEvent event) throws ReflectiveOperationException {
-        if(locked)
+        if (locked)
             return;
         new BukkitRunnable() {
 
@@ -167,8 +168,8 @@ public class TeamPacketManager implements Listener {
             @Override
             public void run() {
                 int packetCount = 1;
-                while(entryIterator.hasNext()){
-                    if(packetCount > PACKET_BY_TICKS)
+                while (entryIterator.hasNext()) {
+                    if (packetCount > PACKET_BY_TICKS)
                         return;
                     final Map.Entry<String, TeamData> entry = entryIterator.next();
                     try {
@@ -178,7 +179,7 @@ public class TeamPacketManager implements Listener {
                                         new ArrayList<>(Collections.singletonList(entry.getKey())),
                                         TeamPacketSender.Method.CREATE
                                 )
-                                );
+                        );
                     } catch (ReflectiveOperationException e) {
                         e.printStackTrace();
                     }

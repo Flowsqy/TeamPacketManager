@@ -3,3 +3,10 @@ author: Flowsqy
 version: ${project.version}
 main: fr.flowsqy.teampacketmanager.TeamPacketManagerPlugin
 api-version: "1.13"
+commands:
+  lockteampacket:
+    description: Switch on or off the team packets
+    usage: /<command> <true|false>
+    aliases:
+      - ltp
+    permission: teampacketmanager.command.lockteampacket

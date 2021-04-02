@@ -1,4 +1,4 @@
-package fr.flowsqy.teampacketmanager;
+package fr.flowsqy.teampacketmanager.commons;
 
 /**
  * How to display the name tags of players on this team

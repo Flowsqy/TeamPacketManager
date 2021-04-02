@@ -1,5 +1,9 @@
 package fr.flowsqy.teampacketmanager;
 
+import fr.flowsqy.teampacketmanager.commons.CollisionRules;
+import fr.flowsqy.teampacketmanager.commons.NameTagVisibility;
+import fr.flowsqy.teampacketmanager.commons.Option;
+import fr.flowsqy.teampacketmanager.commons.TeamData;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -58,10 +62,10 @@ public class TeamPacketSender {
      * Initialization of Reflection
      */
     static {
-        try{
+        try {
             final String versionName = Bukkit.getServer().getClass().getPackage().getName().replace(".", ",").split(",")[3];
-            final String nms = "net.minecraft.server."+versionName+".";
-            final Class<?> packetPlayOutScoreboardTeamClass = Class.forName(nms+"PacketPlayOutScoreboardTeam");
+            final String nms = "net.minecraft.server." + versionName + ".";
+            final Class<?> packetPlayOutScoreboardTeamClass = Class.forName(nms + "PacketPlayOutScoreboardTeam");
 
             packetPlayOutScoreboardTeamConstructor = packetPlayOutScoreboardTeamClass.getDeclaredConstructor();
 
@@ -76,21 +80,21 @@ public class TeamPacketSender {
             methodField = packetPlayOutScoreboardTeamClass.getDeclaredField("i");
             optionField = packetPlayOutScoreboardTeamClass.getDeclaredField("j");
 
-            final Class<?> chatComponentTextClass = Class.forName(nms+"ChatComponentText");
+            final Class<?> chatComponentTextClass = Class.forName(nms + "ChatComponentText");
             chatComponentTextConstructor = chatComponentTextClass.getDeclaredConstructor(String.class);
             final Field emptyChatComponentTextField = chatComponentTextClass.getDeclaredField("d");
             emptyChatComponentTextField.setAccessible(true);
             emptyChatComponentText = emptyChatComponentTextField.get(null);
 
-            final Class<?> craftPlayerClass = Class.forName("org.bukkit.craftbukkit."+versionName+".entity.CraftPlayer");
+            final Class<?> craftPlayerClass = Class.forName("org.bukkit.craftbukkit." + versionName + ".entity.CraftPlayer");
             getHandlePlayerMethod = craftPlayerClass.getDeclaredMethod("getHandle");
-            final Class<?> entityPlayerClass = Class.forName(nms+"EntityPlayer");
+            final Class<?> entityPlayerClass = Class.forName(nms + "EntityPlayer");
             playerConnectionField = entityPlayerClass.getDeclaredField("playerConnection");
-            final Class<?> playerConnectionClass = Class.forName(nms+"PlayerConnection");
-            final Class<?> packetClass = Class.forName(nms+"Packet");
+            final Class<?> playerConnectionClass = Class.forName(nms + "PlayerConnection");
+            final Class<?> packetClass = Class.forName(nms + "Packet");
             sendPacketMethod = playerConnectionClass.getDeclaredMethod("sendPacket", packetClass);
 
-            final Class<?> enumChatFormat = Class.forName(nms+"EnumChatFormat");
+            final Class<?> enumChatFormat = Class.forName(nms + "EnumChatFormat");
 
             BLACK = getColor("BLACK", enumChatFormat);
             DARK_BLUE = getColor("DARK_BLUE", enumChatFormat);
@@ -114,7 +118,7 @@ public class TeamPacketSender {
             UNDERLINE = getColor("UNDERLINE", enumChatFormat);
             ITALIC = getColor("ITALIC", enumChatFormat);
             RESET = getColor("RESET", enumChatFormat);
-        }catch (ReflectiveOperationException e){
+        } catch (ReflectiveOperationException e) {
             throw new RuntimeException("Can not load PacketPlayOutScoreboardTeam fields", e);
         }
 
@@ -136,18 +140,17 @@ public class TeamPacketSender {
         getHandlePlayerMethod.setAccessible(true);
         playerConnectionField.setAccessible(true);
         sendPacketMethod.setAccessible(true);
-
-        System.out.println("Successfully load the TagAPI");
     }
 
     /**
      * Gets nms color Object from EnumChatColor
-     * @param color The name of the color field
+     *
+     * @param color              The name of the color field
      * @param enumChatColorClass The EnumChatColor class
      * @return Nms color Object
      * @throws ReflectiveOperationException If there is no field with this name in the EnumChatColor class
      */
-    private static Object getColor(String color, Class<?> enumChatColorClass) throws ReflectiveOperationException{
+    private static Object getColor(String color, Class<?> enumChatColorClass) throws ReflectiveOperationException {
         final Field colorField = enumChatColorClass.getDeclaredField(color);
         colorField.setAccessible(true);
         return colorField.get(null);
@@ -155,11 +158,12 @@ public class TeamPacketSender {
 
     /**
      * Gets Nms color Object for given ChatColor enum constant
+     *
      * @param color The ChatColor to convert
      * @return Nms color Object corresponding to the given ChatColor
      */
-    private static Object getColor(ChatColor color){
-        switch (color){
+    private static Object getColor(ChatColor color) {
+        switch (color) {
             case BLACK:
                 return BLACK;
             case DARK_BLUE:
@@ -211,18 +215,19 @@ public class TeamPacketSender {
 
     /**
      * Send a fake Scoreboard team to Players
-     * @param receivers The players that will receive the information
-     * @param name The id of the team
-     * @param displayName The name displayed in spectator team hotbar
-     * @param prefix The prefix of the team
-     * @param suffix The suffix of the team
+     *
+     * @param receivers         The players that will receive the information
+     * @param name              The id of the team
+     * @param displayName       The name displayed in spectator team hotbar
+     * @param prefix            The prefix of the team
+     * @param suffix            The suffix of the team
      * @param nameTagVisibility NameTag visibility rules
-     * @param collisionRules Collision rules
-     * @param color The color of the prefix, suffix and pseudo of the player that are in the team.
-     *             The prefix and suffix color can be override by specifying a color in their respective parameter.
-     * @param players The players in the team
-     * @param method The method for information interpretation clientside
-     * @param option Other options
+     * @param collisionRules    Collision rules
+     * @param color             The color of the prefix, suffix and pseudo of the player that are in the team.
+     *                          The prefix and suffix color can be override by specifying a color in their respective parameter.
+     * @param players           The players in the team
+     * @param method            The method for information interpretation clientside
+     * @param option            Other options
      */
     public static void sendTeamInfo(
             Iterable<? extends Player> receivers,
@@ -236,7 +241,7 @@ public class TeamPacketSender {
             Collection<String> players,
             Method method,
             Option option
-    ){
+    ) {
         Objects.requireNonNull(receivers);
         Objects.requireNonNull(name);
         Objects.requireNonNull(displayName);
@@ -249,7 +254,7 @@ public class TeamPacketSender {
         Objects.requireNonNull(method);
         Objects.requireNonNull(option);
 
-        try{
+        try {
             final Object packet = getPacket(
                     name,
                     chatComponentTextConstructor.newInstance(displayName),
@@ -263,26 +268,27 @@ public class TeamPacketSender {
                     option.getPackedOption()
             );
             sendPacketTo(receivers, packet);
-        }catch (ReflectiveOperationException e){
+        } catch (ReflectiveOperationException e) {
             throw new RuntimeException("Can not send team information", e);
         }
     }
 
     /**
      * Method that send a TeamData object
+     *
      * @param receivers The players that will receive the information
-     * @param teamData The team data to send
-     * @param players The players in the team
-     * @param method The method for information interpretation clientside
+     * @param teamData  The team data to send
+     * @param players   The players in the team
+     * @param method    The method for information interpretation clientside
      * @return true if the TeamData is correctly sent, false otherwise
      */
-    public static boolean sendTeamData(Iterable<? extends Player> receivers, TeamData teamData, Collection<String> players, Method method){
-        if(teamData == null || teamData.getId() == null)
+    public static boolean sendTeamData(Iterable<? extends Player> receivers, TeamData teamData, Collection<String> players, Method method) {
+        if (teamData == null || teamData.getId() == null)
             return false;
-        try{
+        try {
             sendPacketTo(receivers, getPacket(teamData, players, method));
             return true;
-        }catch (ReflectiveOperationException e){
+        } catch (ReflectiveOperationException e) {
             return false;
         }
     }
@@ -300,7 +306,7 @@ public class TeamPacketSender {
         sendPacketMethod.invoke(playerConnection, packet);
     }
 
-    public static Object getPacket(TeamData teamData, Collection<String> players, Method method) throws ReflectiveOperationException{
+    public static Object getPacket(TeamData teamData, Collection<String> players, Method method) throws ReflectiveOperationException {
         return getPacket(
                 teamData.getId(),
                 teamData.getDisplayName() == null ? emptyChatComponentText : chatComponentTextConstructor.newInstance(teamData.getDisplayName()),
@@ -315,7 +321,7 @@ public class TeamPacketSender {
         );
     }
 
-    public static Object getPacket (
+    public static Object getPacket(
             String name,
             Object displayName,
             Object prefix,

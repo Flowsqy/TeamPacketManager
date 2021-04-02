@@ -1,0 +1,11 @@
+prefix: "&7[&5TeamPacketManager&7]&f"
+
+util:
+  noperm: "%prefix% &cTu n'as pas la permission d'utiliser cette commande"
+
+command:
+  help: "%prefix% &6/lockteampacket <true|false>"
+  alreadylocked: "%prefix% &cLes paquets de team sont déjà désactivés"
+  notlocked: "%prefix% &cLes paquets de team ne sont pas désactivés"
+  lock: "%prefix% &6Les paquets de team on été bloqués"
+  unlock: "%prefix% &6Les paquets de team on été débloqués"
