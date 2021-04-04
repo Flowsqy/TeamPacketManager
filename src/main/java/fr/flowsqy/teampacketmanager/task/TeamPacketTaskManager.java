@@ -49,6 +49,15 @@ public class TeamPacketTaskManager {
 
     public void remove(Player player) {
         final TeamPacketSendTask task = playerTask.remove(player);
+        cancelTask(task);
+    }
+
+    public void cancelAll() {
+        cancelTask(allTask);
+        playerTask.values().forEach(this::cancelTask);
+    }
+
+    private void cancelTask(AbstractTeamPacketSendTask task) {
         if (task != null && !task.isCancelled())
             task.cancel();
     }

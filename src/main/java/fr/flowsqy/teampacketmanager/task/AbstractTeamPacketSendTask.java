@@ -25,8 +25,8 @@ public abstract class AbstractTeamPacketSendTask extends BukkitRunnable {
 
     private final Queue<Object> queue;
     private final Runnable closeHandler;
-    private int persistent;
     private final int runtimeErrors;
+    private int persistent;
 
     public AbstractTeamPacketSendTask(Runnable closeHandler) {
         this.queue = new ArrayDeque<>();

@@ -22,9 +22,9 @@ public class TeamPacketManager implements Listener {
     private final TeamPacketTaskManager taskManager;
     private boolean locked;
 
-    public TeamPacketManager(TeamPacketManagerPlugin plugin) {
+    public TeamPacketManager(TeamPacketManagerPlugin plugin, TeamPacketTaskManager taskManager) {
         data = new HashMap<>();
-        taskManager = new TeamPacketTaskManager(plugin);
+        this.taskManager = taskManager;
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 

@@ -2,6 +2,7 @@ package fr.flowsqy.teampacketmanager;
 
 import fr.flowsqy.teampacketmanager.commands.TeamPacketManagerCommand;
 import fr.flowsqy.teampacketmanager.io.Messages;
+import fr.flowsqy.teampacketmanager.task.TeamPacketTaskManager;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -17,6 +18,7 @@ public class TeamPacketManagerPlugin extends JavaPlugin {
 
     private YamlConfiguration configuration;
     private Messages messages;
+    private TeamPacketTaskManager taskManager;
     private TeamPacketManager teamPacketManager;
 
     @Override
@@ -34,9 +36,15 @@ public class TeamPacketManagerPlugin extends JavaPlugin {
         this.configuration = initFile(dataFolder, "config.yml");
         this.messages = new Messages(initFile(dataFolder, "messages.yml"));
 
-        teamPacketManager = new TeamPacketManager(this);
+        taskManager = new TeamPacketTaskManager(this);
+        teamPacketManager = new TeamPacketManager(this, taskManager);
 
         new TeamPacketManagerCommand(this);
+    }
+
+    @Override
+    public void onDisable() {
+        taskManager.cancelAll();
     }
 
     private boolean checkDataFolder(File dataFolder) {
