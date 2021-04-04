@@ -25,8 +25,8 @@ public abstract class AbstractTeamPacketSendTask extends BukkitRunnable {
 
     private final Queue<Object> queue;
     private final Runnable closeHandler;
-    private final int runtimeErrors;
     private int persistent;
+    private int runtimeErrors;
 
     public AbstractTeamPacketSendTask(Runnable closeHandler) {
         this.queue = new ArrayDeque<>();
@@ -52,6 +52,10 @@ public abstract class AbstractTeamPacketSendTask extends BukkitRunnable {
                 send(packet);
             } catch (ReflectiveOperationException exception) {
                 exception.printStackTrace();
+                runtimeErrors++;
+                if (runtimeErrors > 5) {
+                    cancel();
+                }
             }
             packetCount++;
             if (packetCount > PACKET_BY_TICKS)
