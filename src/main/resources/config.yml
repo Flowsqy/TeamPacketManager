@@ -1,2 +1,3 @@
 packets-by-ticks: 10  # Minimum 1
 interval-packet-sent: 4 # Between 20 and 1
+task-persistent: 20 # Minimum 0

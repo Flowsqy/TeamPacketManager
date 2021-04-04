@@ -1,6 +1,7 @@
 package fr.flowsqy.teampacketmanager;
 
 import fr.flowsqy.teampacketmanager.commons.TeamData;
+import fr.flowsqy.teampacketmanager.task.TeamPacketTaskManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -8,35 +9,23 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class TeamPacketManager implements Listener {
 
-    private final int PACKET_BY_TICKS;
-    private final int INTERVAL_PACKET_SENT;
-
-    private final Plugin plugin;
     private final Map<String, TeamData> data;
-
+    private final TeamPacketTaskManager taskManager;
     private boolean locked;
 
     public TeamPacketManager(TeamPacketManagerPlugin plugin) {
-        PACKET_BY_TICKS = clamp(plugin.getConfiguration().getInt("packets-by-ticks", 10), Integer.MAX_VALUE, 1);
-        INTERVAL_PACKET_SENT = clamp(plugin.getConfiguration().getInt("interval-packet-sent", 4), 20, 1);
-        this.plugin = plugin;
         data = new HashMap<>();
+        taskManager = new TeamPacketTaskManager(plugin);
         Bukkit.getPluginManager().registerEvents(this, plugin);
-    }
-
-    private static int clamp(int value, int max, int min) {
-        if (max > value)
-            return max;
-        if (min < value)
-            return min;
-        return value;
     }
 
     public boolean isLocked() {
@@ -47,56 +36,37 @@ public class TeamPacketManager implements Listener {
         if (this.locked == locked)
             return;
         this.locked = locked;
+        final List<Object> packets;
         if (locked) {
-            new BukkitRunnable() {
-
-                private final Iterator<Map.Entry<String, TeamData>> entryIterator;
-
-                {
-                    entryIterator = data.entrySet().iterator();
-                }
-
-                @Override
-                public void run() {
-                    int packetCount = 1;
-                    while (entryIterator.hasNext()) {
-                        if (packetCount > PACKET_BY_TICKS)
-                            return;
-                        final Map.Entry<String, TeamData> entry = entryIterator.next();
-                        removeTeam(entry.getValue().getId());
-                        packetCount++;
-                    }
-                    cancel();
-                }
-            }.runTaskTimer(plugin, 0L, INTERVAL_PACKET_SENT);
+            packets = data.values().stream()
+                    .map(teamData -> {
+                        try {
+                            return TeamPacketSender.getPacket(
+                                    new TeamData(teamData.getId()),
+                                    Collections.emptyList(),
+                                    TeamPacketSender.Method.REMOVE
+                            );
+                        } catch (ReflectiveOperationException exception) {
+                            throw new RuntimeException(exception);
+                        }
+                    })
+                    .collect(Collectors.toList());
         } else {
-            new BukkitRunnable() {
-
-                private final Iterator<Map.Entry<String, TeamData>> entryIterator;
-
-                {
-                    entryIterator = data.entrySet().iterator();
-                }
-
-                @Override
-                public void run() {
-                    int packetCount = 1;
-                    while (entryIterator.hasNext()) {
-                        if (packetCount > PACKET_BY_TICKS)
-                            return;
-                        final Map.Entry<String, TeamData> entry = entryIterator.next();
-                        TeamPacketSender.sendTeamData(
-                                Bukkit.getOnlinePlayers(),
-                                entry.getValue(),
-                                new ArrayList<>(Collections.singletonList(entry.getKey())),
-                                TeamPacketSender.Method.CREATE
-                        );
-                        packetCount++;
-                    }
-                    cancel();
-                }
-            }.runTaskTimer(plugin, 0L, INTERVAL_PACKET_SENT);
+            packets = data.entrySet().stream()
+                    .map(entry -> {
+                        try {
+                            return TeamPacketSender.getPacket(
+                                    entry.getValue(),
+                                    Collections.singletonList(entry.getKey()),
+                                    TeamPacketSender.Method.CREATE
+                            );
+                        } catch (ReflectiveOperationException exception) {
+                            throw new RuntimeException(exception);
+                        }
+                    })
+                    .collect(Collectors.toList());
         }
+        taskManager.subscribeAll(packets);
     }
 
     public TeamData applyTeamData(Player player, TeamData teamData) {
@@ -110,12 +80,17 @@ public class TeamPacketManager implements Listener {
             return previousData;
         if (previousData == null) {
             data.put(playerName, teamData);
-            TeamPacketSender.sendTeamData(
-                    Bukkit.getOnlinePlayers(),
-                    teamData,
-                    new ArrayList<>(Collections.singletonList(playerName)),
-                    TeamPacketSender.Method.CREATE
-            );
+            final Object packet;
+            try {
+                packet = TeamPacketSender.getPacket(
+                        teamData,
+                        Collections.singletonList(playerName),
+                        TeamPacketSender.Method.CREATE
+                );
+            } catch (ReflectiveOperationException exception) {
+                throw new RuntimeException(exception);
+            }
+            taskManager.subscribeAll(packet);
             return null;
         }
         final TeamData conflictData = previousData.merge(teamData);
@@ -123,12 +98,17 @@ public class TeamPacketManager implements Listener {
         if (changeName) {
             removeTeam(conflictData.getId());
         }
-        TeamPacketSender.sendTeamData(
-                Bukkit.getOnlinePlayers(),
-                previousData,
-                new ArrayList<>(Collections.singletonList(playerName)),
-                changeName ? TeamPacketSender.Method.CREATE : TeamPacketSender.Method.UPDATE_INFO
-        );
+        final Object packet;
+        try {
+            packet = TeamPacketSender.getPacket(
+                    previousData,
+                    Collections.singletonList(playerName),
+                    changeName ? TeamPacketSender.Method.CREATE : TeamPacketSender.Method.UPDATE_INFO
+            );
+        } catch (ReflectiveOperationException exception) {
+            throw new RuntimeException(exception);
+        }
+        taskManager.subscribeAll(packet);
         return conflictData;
     }
 
@@ -143,56 +123,45 @@ public class TeamPacketManager implements Listener {
     }
 
     private void removeTeam(String id) {
-        TeamPacketSender.sendTeamData(
-                Bukkit.getOnlinePlayers(),
-                new TeamData(id),
-                new ArrayList<>(),
-                TeamPacketSender.Method.REMOVE
-        );
+        final Object packet;
+        try {
+            packet = TeamPacketSender.getPacket(
+                    new TeamData(id),
+                    Collections.emptyList(),
+                    TeamPacketSender.Method.REMOVE
+            );
+        } catch (ReflectiveOperationException exception) {
+            throw new RuntimeException(exception);
+        }
+        taskManager.subscribeAll(packet);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     private void onQuit(PlayerQuitEvent event) {
         removeTeamData(event.getPlayer().getName());
+        taskManager.remove(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    private void onJoin(PlayerJoinEvent event) throws ReflectiveOperationException {
+    private void onJoin(PlayerJoinEvent event) {
         if (locked)
             return;
-        new BukkitRunnable() {
-
-            private final Object playerConnection;
-            private final Iterator<Map.Entry<String, TeamData>> entryIterator;
-
-            {
-                playerConnection = TeamPacketSender.getPlayerConnection(event.getPlayer());
-                entryIterator = data.entrySet().iterator();
-            }
-
-            @Override
-            public void run() {
-                int packetCount = 1;
-                while (entryIterator.hasNext()) {
-                    if (packetCount > PACKET_BY_TICKS)
-                        return;
-                    final Map.Entry<String, TeamData> entry = entryIterator.next();
+        if (data.isEmpty())
+            return;
+        final List<Object> packets = data.entrySet().stream()
+                .map(entry -> {
                     try {
-                        TeamPacketSender.sendPacket(playerConnection,
-                                TeamPacketSender.getPacket(
-                                        entry.getValue(),
-                                        new ArrayList<>(Collections.singletonList(entry.getKey())),
-                                        TeamPacketSender.Method.CREATE
-                                )
+                        return TeamPacketSender.getPacket(
+                                entry.getValue(),
+                                Collections.singletonList(entry.getKey()),
+                                TeamPacketSender.Method.CREATE
                         );
-                    } catch (ReflectiveOperationException e) {
-                        e.printStackTrace();
+                    } catch (ReflectiveOperationException exception) {
+                        throw new RuntimeException(exception);
                     }
-                    packetCount++;
-                }
-                cancel();
-            }
-        }.runTaskTimer(plugin, 0L, INTERVAL_PACKET_SENT);
+                })
+                .collect(Collectors.toList());
+        taskManager.subscribe(event.getPlayer(), packets);
     }
 
 }
