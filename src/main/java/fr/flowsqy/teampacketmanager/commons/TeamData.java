@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 public class TeamData {
 
     public final static String DEFAULT_TEAM_ID = "NULL";
+    public final static TeamData NULL = new TeamData(DEFAULT_TEAM_ID);
 
     private String id;
     private String displayName;
@@ -132,6 +133,10 @@ public class TeamData {
             return defaultValue;
         setter.accept(newer);
         return current;
+    }
+
+    public boolean isNull(){
+        return equals(NULL);
     }
 
     @Override
