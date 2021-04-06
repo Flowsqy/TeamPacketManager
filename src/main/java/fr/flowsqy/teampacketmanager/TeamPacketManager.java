@@ -10,10 +10,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class TeamPacketManager implements Listener {
@@ -69,15 +66,18 @@ public class TeamPacketManager implements Listener {
         taskManager.subscribeAll(packets);
     }
 
+    public TeamData get(Player player) {
+        return applyTeamData(player, null);
+    }
+
     public TeamData applyTeamData(Player player, TeamData teamData) {
-        if (locked)
-            return null;
-        if (player == null)
-            return null;
+        Objects.requireNonNull(player);
         final String playerName = player.getName();
         final TeamData previousData = data.get(playerName);
         if (teamData == null)
             return previousData;
+        if (!teamData.canSend())
+            throw new IllegalArgumentException(teamData + " can not be sent");
         if (previousData == null) {
             data.put(playerName, teamData);
             final Object packet;
@@ -94,8 +94,8 @@ public class TeamPacketManager implements Listener {
             return null;
         }
         final TeamData conflictData = previousData.merge(teamData);
-        final boolean changeName = !conflictData.getId().equals(TeamData.DEFAULT_TEAM_ID);
-        if (changeName) {
+        final boolean changeName = conflictData.canSend();
+        if (changeName && !locked) {
             removeTeam(conflictData.getId());
         }
         final Object packet;
@@ -114,9 +114,7 @@ public class TeamPacketManager implements Listener {
 
     public TeamData removeTeamData(String player) {
         final TeamData teamData = data.remove(player);
-        if (locked)
-            return teamData;
-        if (teamData != null && !teamData.getId().equals(TeamData.DEFAULT_TEAM_ID)) {
+        if (!locked && teamData != null && teamData.canSend()) {
             removeTeam(teamData.getId());
         }
         return teamData;
@@ -144,9 +142,7 @@ public class TeamPacketManager implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     private void onJoin(PlayerJoinEvent event) {
-        if (locked)
-            return;
-        if (data.isEmpty())
+        if (locked || data.isEmpty())
             return;
         final List<Object> packets = data.entrySet().stream()
                 .map(entry -> {

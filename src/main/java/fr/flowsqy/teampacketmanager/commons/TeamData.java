@@ -135,8 +135,12 @@ public class TeamData {
         return current;
     }
 
-    public boolean isNull(){
+    public boolean isNull() {
         return equals(NULL);
+    }
+
+    public boolean canSend() {
+        return !id.equals(DEFAULT_TEAM_ID);
     }
 
     @Override
