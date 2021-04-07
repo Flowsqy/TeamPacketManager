@@ -74,7 +74,7 @@ public class TeamPacketManager implements Listener {
         Objects.requireNonNull(player);
         final String playerName = player.getName();
         final TeamData previousData = data.get(playerName);
-        if (teamData == null)
+        if (teamData == null || teamData.isNull())
             return previousData;
         if (!teamData.canSend())
             throw new IllegalArgumentException(teamData + " can not be sent");
@@ -92,6 +92,9 @@ public class TeamPacketManager implements Listener {
             }
             taskManager.subscribeAll(packet);
             return null;
+        }
+        if(previousData.equals(teamData)){
+            return previousData;
         }
         final TeamData conflictData = previousData.merge(teamData);
         final boolean changeName = conflictData.canSend();
