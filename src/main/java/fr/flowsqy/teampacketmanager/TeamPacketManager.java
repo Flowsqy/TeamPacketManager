@@ -93,7 +93,7 @@ public class TeamPacketManager implements Listener {
             taskManager.subscribeAll(packet);
             return null;
         }
-        if(previousData.equals(teamData)){
+        if (previousData.equals(teamData)) {
             return previousData;
         }
         final TeamData conflictData = previousData.merge(teamData);
