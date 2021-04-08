@@ -1,6 +1,7 @@
 package fr.flowsqy.teampacketmanager;
 
 import fr.flowsqy.teampacketmanager.commons.TeamData;
+import fr.flowsqy.teampacketmanager.io.Messages;
 import fr.flowsqy.teampacketmanager.task.TeamPacketTaskManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -11,16 +12,24 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class TeamPacketManager implements Listener {
 
+    private final Logger logger;
+    private final Messages messages;
     private final Map<String, TeamData> data;
+    private final Map<String, String> idPlayer;
     private final TeamPacketTaskManager taskManager;
     private boolean locked;
 
     public TeamPacketManager(TeamPacketManagerPlugin plugin, TeamPacketTaskManager taskManager) {
+        logger = plugin.getLogger();
+        messages = plugin.getMessages();
         data = new HashMap<>();
+        idPlayer = new HashMap<>();
         this.taskManager = taskManager;
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
@@ -116,9 +125,21 @@ public class TeamPacketManager implements Listener {
     }
 
     public TeamData removeTeamData(String player) {
+        Objects.requireNonNull(player);
         final TeamData teamData = data.remove(player);
-        if (!locked && teamData != null && teamData.canSend()) {
-            removeTeam(teamData.getId());
+        if (teamData != null && teamData.canSend()) {
+            final String id = teamData.getId();
+            if (!locked) {
+                removeTeam(id);
+            }
+            final String removedPlayer = idPlayer.remove(id);
+            final String awkwardMessage = messages.getMessage("manager.awkward-remove",
+                    "%teamplayer%", "%idplayer%", "%teamid%",
+                    player, String.valueOf(removedPlayer), id
+            );
+            if (awkwardMessage != null && !player.equals(removedPlayer)) {
+                logger.log(Level.WARNING, awkwardMessage);
+            }
         }
         return teamData;
     }

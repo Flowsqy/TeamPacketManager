@@ -3,6 +3,10 @@ prefix: "&7[&5TeamPacketManager&7]&f"
 util:
   noperm: "%prefix% &cTu n'as pas la permission d'utiliser cette commande"
 
+manager:
+  awkward-remove: "La team de '%teamplayer%' n'était pas reliée au bon identifiant mais à celui de '%idplayer%'.
+   Il est possible qu'il y ait une désynchronisation. (Identifiant de team : '%teamid%')"
+
 command:
   help: "%prefix% &6/lockteampacket <true|false>"
   alreadylocked: "%prefix% &cLes paquets de team sont déjà désactivés"
