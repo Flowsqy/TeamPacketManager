@@ -1,6 +1,7 @@
 package fr.flowsqy.teampacketmanager;
 
 import fr.flowsqy.teampacketmanager.commons.TeamData;
+import fr.flowsqy.teampacketmanager.exception.TeamIdException;
 import fr.flowsqy.teampacketmanager.io.Messages;
 import fr.flowsqy.teampacketmanager.task.TeamPacketTaskManager;
 import org.bukkit.Bukkit;
@@ -83,33 +84,68 @@ public class TeamPacketManager implements Listener {
         Objects.requireNonNull(player);
         final String playerName = player.getName();
         final TeamData previousData = data.get(playerName);
+        // Try to send Null Data
         if (teamData == null || teamData.isNull())
             return previousData;
+        // Try to send a data with null id
         if (!teamData.canSend())
             throw new IllegalArgumentException(teamData + " can not be sent");
+        // Try to send a team that is already assigned to another player
+        final String linkedPlayer = idPlayer.get(teamData.getId());
+        if (linkedPlayer != null && !playerName.equals(linkedPlayer)) {
+            throw new TeamIdException("The id " + teamData.getId() + " is already taken by the player '" + linkedPlayer + "'");
+        }
+        // The previous data does not exist -> Create a new one
         if (previousData == null) {
             data.put(playerName, teamData);
-            final Object packet;
-            try {
-                packet = TeamPacketSender.getPacket(
-                        teamData,
-                        Collections.singletonList(playerName),
-                        TeamPacketSender.Method.CREATE
-                );
-            } catch (ReflectiveOperationException exception) {
-                throw new RuntimeException(exception);
+            // Register the new id
+            idPlayer.put(teamData.getId(), playerName);
+            // If locked, does not send the packet
+            if (!locked) {
+                final Object packet;
+                try {
+                    packet = TeamPacketSender.getPacket(
+                            teamData,
+                            Collections.singletonList(playerName),
+                            TeamPacketSender.Method.CREATE
+                    );
+                } catch (ReflectiveOperationException exception) {
+                    throw new RuntimeException(exception);
+                }
+                taskManager.subscribeAll(packet);
             }
-            taskManager.subscribeAll(packet);
             return null;
         }
+        // The new data is exactly the same as the previous one -> Nothing to do
         if (previousData.equals(teamData)) {
             return previousData;
         }
+        // Merge to actualize data
         final TeamData conflictData = previousData.merge(teamData);
         final boolean changeName = conflictData.canSend();
-        if (changeName && !locked) {
-            removeTeam(conflictData.getId());
+        // Team change id -> Remove the old one
+        if (changeName) {
+            final String previousId = conflictData.getId();
+            final String removedPlayer = idPlayer.remove(previousId);
+            // Check if we remove the good player from id map for synchronisation warning
+            if (!playerName.equals(removedPlayer)) {
+                final String awkwardMessage = messages.getMessage("manager.awkward-remove",
+                        "%teamplayer%", "%idplayer%", "%teamid%",
+                        playerName, String.valueOf(removedPlayer), previousId
+                );
+                if (awkwardMessage != null)
+                    logger.log(Level.WARNING, awkwardMessage);
+            }
+            // Register the new id
+            idPlayer.put(teamData.getId(), playerName);
+            // Does not send the packet if the tab is locked
+            if (!locked) {
+                removeTeam(conflictData.getId());
+            }
         }
+        // Does not send the packet if the tab is locked
+        if (locked)
+            return conflictData;
         final Object packet;
         try {
             packet = TeamPacketSender.getPacket(
