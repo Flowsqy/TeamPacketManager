@@ -35,10 +35,18 @@ public class TeamPacketManager implements Listener {
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
+    /**
+     * Lock state
+     * @return true if packets are locked, false otherwise
+     */
     public boolean isLocked() {
         return locked;
     }
 
+    /**
+     * Lock or unlock packets
+     * @param locked true to lock packets, false to unlock
+     */
     public void setLocked(boolean locked) {
         if (this.locked == locked)
             return;
@@ -76,10 +84,24 @@ public class TeamPacketManager implements Listener {
         taskManager.subscribeAll(packets);
     }
 
+    /**
+     * Get the current TeamData
+     * @param player The player who is linked to the team data
+     * @return The team data
+     */
     public TeamData get(Player player) {
         return applyTeamData(player, null);
     }
 
+    /**
+     * Apply a custom team data to a player
+     * @param player The targeted player
+     * @param teamData The data to send
+     * @return The old TeamData, can be null if player was not registered
+     * @throws NullPointerException if the player is null
+     * @throws IllegalArgumentException if the team data can not be sent
+     * @throws TeamIdException if the id is already taken by another player
+     */
     public TeamData applyTeamData(Player player, TeamData teamData) {
         Objects.requireNonNull(player);
         final String playerName = player.getName();
@@ -93,7 +115,7 @@ public class TeamPacketManager implements Listener {
         // Try to send a team that is already assigned to another player
         final String linkedPlayer = idPlayer.get(teamData.getId());
         if (linkedPlayer != null && !playerName.equals(linkedPlayer)) {
-            throw new TeamIdException("The id " + teamData.getId() + " is already taken by the player '" + linkedPlayer + "'");
+            throw new TeamIdException("The id '" + teamData.getId() + "' is already taken by the player '" + linkedPlayer + "'");
         }
         // The previous data does not exist -> Create a new one
         if (previousData == null) {
@@ -160,6 +182,11 @@ public class TeamPacketManager implements Listener {
         return conflictData;
     }
 
+    /**
+     * Remove the TeamData of a player
+     * @param player The targeted player
+     * @return The data who is removed
+     */
     public TeamData removeTeamData(String player) {
         Objects.requireNonNull(player);
         final TeamData teamData = data.remove(player);
@@ -180,6 +207,10 @@ public class TeamPacketManager implements Listener {
         return teamData;
     }
 
+    /**
+     * Send a remove packet
+     * @param id the id of the team to remove
+     */
     private void removeTeam(String id) {
         final Object packet;
         try {
@@ -194,12 +225,20 @@ public class TeamPacketManager implements Listener {
         taskManager.subscribeAll(packet);
     }
 
+    /**
+     * Quit event handle method to remove the data of player who leave the server
+     * @param event The PlayerQuitEvent
+     */
     @EventHandler(priority = EventPriority.MONITOR)
     private void onQuit(PlayerQuitEvent event) {
         removeTeamData(event.getPlayer().getName());
         taskManager.remove(event.getPlayer());
     }
 
+    /**
+     * Join event handle method to send data of players who are already connected
+     * @param event The PlayerJoinEvent
+     */
     @EventHandler(priority = EventPriority.MONITOR)
     private void onJoin(PlayerJoinEvent event) {
         if (locked || data.isEmpty())
