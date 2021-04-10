@@ -229,6 +229,16 @@ public class TeamPacketManager implements Listener {
         taskManager.subscribeAll(packets);
     }
 
+    /**
+     * Add the three packets to update a team client side
+     *
+     * @param packets            The packet list
+     * @param previousPlayerName The name of previous player who owned the team
+     * @param playerName         The name of the new player who own the team
+     * @param teamData           The data of the new team
+     * @param id                 The id of the data
+     * @throws ReflectiveOperationException if a packet creation fail
+     */
     private void updateTeam(
             List<Object> packets,
             String previousPlayerName,
