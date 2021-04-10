@@ -25,7 +25,7 @@ public class TeamPacketTaskManager {
 
     public void subscribeAll(List<Object> packets) {
         if (allTask == null) {
-            allTask = new TeamPacketSendAllTask(() -> allTask = null);
+            allTask = new TeamPacketSendAllTask(() -> allTask = null, playerTask);
             allTask.add(packets);
             allTask.start(plugin);
         } else
