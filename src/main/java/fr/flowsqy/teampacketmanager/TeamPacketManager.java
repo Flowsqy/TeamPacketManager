@@ -25,6 +25,7 @@ public class TeamPacketManager implements Listener {
     private final Map<String, TeamData> data;
     private final Map<String, String> idPlayer;
     private final TeamPacketTaskManager taskManager;
+    private final Object lock;
     private boolean locked;
 
     public TeamPacketManager(TeamPacketManagerPlugin plugin, TeamPacketTaskManager taskManager) {
@@ -33,6 +34,7 @@ public class TeamPacketManager implements Listener {
         data = new HashMap<>();
         idPlayer = new HashMap<>();
         this.taskManager = taskManager;
+        lock = new Object();
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
@@ -51,40 +53,42 @@ public class TeamPacketManager implements Listener {
      * @param locked true to lock packets, false to unlock
      */
     public void setLocked(boolean locked) {
-        if (this.locked == locked)
-            return;
-        this.locked = locked;
-        final List<Object> packets;
-        if (locked) {
-            packets = data.values().stream()
-                    .map(teamData -> {
-                        try {
-                            return TeamPacketSender.getPacket(
-                                    new TeamData(teamData.getId()),
-                                    Collections.emptyList(),
-                                    TeamPacketSender.Method.REMOVE
-                            );
-                        } catch (ReflectiveOperationException exception) {
-                            throw new RuntimeException(exception);
-                        }
-                    })
-                    .collect(Collectors.toList());
-        } else {
-            packets = data.entrySet().stream()
-                    .map(entry -> {
-                        try {
-                            return TeamPacketSender.getPacket(
-                                    entry.getValue(),
-                                    Collections.singletonList(entry.getKey()),
-                                    TeamPacketSender.Method.CREATE
-                            );
-                        } catch (ReflectiveOperationException exception) {
-                            throw new RuntimeException(exception);
-                        }
-                    })
-                    .collect(Collectors.toList());
+        synchronized (lock) {
+            if (this.locked == locked)
+                return;
+            this.locked = locked;
+            final List<Object> packets;
+            if (locked) {
+                packets = data.values().stream()
+                        .map(teamData -> {
+                            try {
+                                return TeamPacketSender.getPacket(
+                                        new TeamData(teamData.getId()),
+                                        Collections.emptyList(),
+                                        TeamPacketSender.Method.REMOVE
+                                );
+                            } catch (ReflectiveOperationException exception) {
+                                throw new RuntimeException(exception);
+                            }
+                        })
+                        .collect(Collectors.toList());
+            } else {
+                packets = data.entrySet().stream()
+                        .map(entry -> {
+                            try {
+                                return TeamPacketSender.getPacket(
+                                        entry.getValue(),
+                                        Collections.singletonList(entry.getKey()),
+                                        TeamPacketSender.Method.CREATE
+                                );
+                            } catch (ReflectiveOperationException exception) {
+                                throw new RuntimeException(exception);
+                            }
+                        })
+                        .collect(Collectors.toList());
+            }
+            taskManager.subscribeAll(packets);
         }
-        taskManager.subscribeAll(packets);
     }
 
     /**
@@ -94,7 +98,9 @@ public class TeamPacketManager implements Listener {
      * @return The team data
      */
     public TeamData get(Player player) {
-        return applyTeamData(player, null);
+        synchronized (lock) {
+            return applyTeamData(player, null);
+        }
     }
 
     /**
@@ -102,55 +108,100 @@ public class TeamPacketManager implements Listener {
      *
      * @param applicableList The list of all Team that will be sent
      */
-    public synchronized void applyTeamData(List<ApplicableTeamData> applicableList) {
-        final Set<String> players = new HashSet<>(applicableList.size());
-        final Set<String> ids = new HashSet<>(applicableList.size());
-        // Find same values and register all player names and ids
-        for (ApplicableTeamData applicable : applicableList) {
-            if (applicable == null)
-                continue;
-            if (!applicable.getTeamData().canSend())
-                continue;
-            if (!players.add(applicable.getPlayer().getName()))
-                throw new RuntimeException(
-                        "Attempting to change the team data for player '"
-                                + applicable.getPlayer().getName()
-                                + "' two times in same instruction. Can not select the good id and pass id check");
-            if (!ids.add(applicable.getTeamData().getId()))
-                throw new TeamIdException("Attempting to register same id for different players : " + applicable.getTeamData().getId());
-        }
-        final List<Object> packets = new ArrayList<>(ids.size());
-        final Set<String> removed = new HashSet<>();
-        final Set<String> updated = new HashSet<>();
-        for (ApplicableTeamData applicable : applicableList) {
-            final TeamData newData = applicable.getTeamData();
-            final String id = newData.getId();
-            final String previousPlayerName = idPlayer.get(id);
-            final boolean update = previousPlayerName != null;
-            // Id is already set but will not be updated -> Same id for two teams (registered and to register)
-            if (update && !players.contains(previousPlayerName)) {
-                throw new TeamIdException("The id '" + id + "' is already taken by the player '" + previousPlayerName + "'");
+    public void applyTeamData(List<ApplicableTeamData> applicableList) {
+        synchronized (lock) {
+            final Set<String> players = new HashSet<>(applicableList.size());
+            final Set<String> ids = new HashSet<>(applicableList.size());
+            // Find same values and register all player names and ids
+            for (ApplicableTeamData applicable : applicableList) {
+                if (applicable == null)
+                    continue;
+                if (!applicable.getTeamData().canSend())
+                    continue;
+                if (!players.add(applicable.getPlayer().getName()))
+                    throw new RuntimeException(
+                            "Attempting to change the team data for player '"
+                                    + applicable.getPlayer().getName()
+                                    + "' two times in same instruction. Can not select the good id and pass id check");
+                if (!ids.add(applicable.getTeamData().getId()))
+                    throw new TeamIdException("Attempting to register same id for different players : " + applicable.getTeamData().getId());
             }
+            final List<Object> packets = new ArrayList<>(ids.size());
+            final Set<String> removed = new HashSet<>();
+            final Set<String> updated = new HashSet<>();
+            for (ApplicableTeamData applicable : applicableList) {
+                final TeamData newData = applicable.getTeamData();
+                final String id = newData.getId();
+                final String previousPlayerName = idPlayer.get(id);
+                final boolean update = previousPlayerName != null;
+                // Id is already set but will not be updated -> Same id for two teams (registered and to register)
+                if (update && !players.contains(previousPlayerName)) {
+                    throw new TeamIdException("The id '" + id + "' is already taken by the player '" + previousPlayerName + "'");
+                }
 
-            final String playerName = applicable.getPlayer().getName();
-            final TeamData currentData = data.get(playerName);
+                final String playerName = applicable.getPlayer().getName();
+                final TeamData currentData = data.get(playerName);
 
-            // Player has not previous team data -> register it server side
-            if (currentData == null) {
+                // Player has not previous team data -> register it server side
+                if (currentData == null) {
+                    if (!locked) {
+                        try {
+                            // The team already exist client side -> update it
+                            if (update) {
+                                updateTeam(packets, previousPlayerName, playerName, newData, id);
+                                // If the team will be removed, remove it from remove list, add it as updated otherwise
+                                if (!removed.remove(id)) {
+                                    updated.add(id);
+                                }
+                            }
+                            // The team does not exist client side -> create it
+                            else {
+                                packets.add(TeamPacketSender.getPacket(
+                                        newData,
+                                        Collections.singletonList(playerName),
+                                        TeamPacketSender.Method.CREATE
+                                        )
+                                );
+                            }
+                        } catch (ReflectiveOperationException exception) {
+                            throw new RuntimeException(exception);
+                        }
+                    }
+                    data.put(playerName, newData);
+                    idPlayer.put(id, playerName);
+                    continue;
+                }
+
+                // Player has a previous team data
+
+                // The new data is same as the old one
+                if (currentData.equals(newData)) {
+                    continue;
+                }
+
+                // Update the data
+                final TeamData conflictData = currentData.merge(newData);
+
                 if (!locked) {
                     try {
-                        // The team already exist client side -> update it
+                        // Exist client side -> Update it client side
                         if (update) {
-                            updateTeam(packets, previousPlayerName, playerName, newData, id);
+                            updateTeam(packets, previousPlayerName, playerName, currentData, id);
                             // If the team will be removed, remove it from remove list, add it as updated otherwise
                             if (!removed.remove(id)) {
                                 updated.add(id);
                             }
                         }
-                        // The team does not exist client side -> create it
+                        // Or Create a new team client side but the player has an old team data (both side)
                         else {
+                            // Remove from updated, add to remove list if has not been updated yet
+                            if (!updated.remove(conflictData.getId())) {
+                                // Add to remove list old id that is not updated yet
+                                removed.add(conflictData.getId());
+                            }
+                            // Add the new team client side
                             packets.add(TeamPacketSender.getPacket(
-                                    newData,
+                                    currentData,
                                     Collections.singletonList(playerName),
                                     TeamPacketSender.Method.CREATE
                                     )
@@ -160,73 +211,30 @@ public class TeamPacketManager implements Listener {
                         throw new RuntimeException(exception);
                     }
                 }
-                data.put(playerName, newData);
+
+                // Register the new id
                 idPlayer.put(id, playerName);
-                continue;
             }
-
-            // Player has a previous team data
-
-            // The new data is same as the old one
-            if (currentData.equals(newData)) {
-                continue;
-            }
-
-            // Update the data
-            final TeamData conflictData = currentData.merge(newData);
-
-            if (!locked) {
-                try {
-                    // Exist client side -> Update it client side
-                    if (update) {
-                        updateTeam(packets, previousPlayerName, playerName, currentData, id);
-                        // If the team will be removed, remove it from remove list, add it as updated otherwise
-                        if (!removed.remove(id)) {
-                            updated.add(id);
-                        }
-                    }
-                    // Or Create a new team client side but the player has an old team data (both side)
-                    else {
-                        // Remove from updated, add to remove list if has not been updated yet
-                        if (!updated.remove(conflictData.getId())) {
-                            // Add to remove list old id that is not updated yet
-                            removed.add(conflictData.getId());
-                        }
-                        // Add the new team client side
+            // Remove all unused teams
+            for (String removeId : removed) {
+                if (!locked) {
+                    try {
                         packets.add(TeamPacketSender.getPacket(
-                                currentData,
-                                Collections.singletonList(playerName),
-                                TeamPacketSender.Method.CREATE
+                                new TeamData(removeId),
+                                Collections.emptyList(),
+                                TeamPacketSender.Method.REMOVE
                                 )
                         );
+                    } catch (ReflectiveOperationException exception) {
+                        throw new RuntimeException(exception);
                     }
-                } catch (ReflectiveOperationException exception) {
-                    throw new RuntimeException(exception);
                 }
+                idPlayer.remove(removeId);
             }
 
-            // Register the new id
-            idPlayer.put(id, playerName);
+            // Send packets
+            taskManager.subscribeAll(packets);
         }
-        // Remove all unused teams
-        for (String removeId : removed) {
-            if (!locked) {
-                try {
-                    packets.add(TeamPacketSender.getPacket(
-                            new TeamData(removeId),
-                            Collections.emptyList(),
-                            TeamPacketSender.Method.REMOVE
-                            )
-                    );
-                } catch (ReflectiveOperationException exception) {
-                    throw new RuntimeException(exception);
-                }
-            }
-            idPlayer.remove(removeId);
-        }
-
-        // Send packets
-        taskManager.subscribeAll(packets);
     }
 
     /**
@@ -293,84 +301,86 @@ public class TeamPacketManager implements Listener {
      * @throws IllegalArgumentException if the team data can not be sent
      * @throws TeamIdException          if the id is already taken by another player
      */
-    public synchronized TeamData applyTeamData(Player player, TeamData teamData) {
-        Objects.requireNonNull(player);
-        final String playerName = player.getName();
-        final TeamData previousData = data.get(playerName);
-        // Try to send Null Data
-        if (teamData == null || teamData.isNull())
-            return previousData;
-        // Try to send a data with null id
-        if (!teamData.canSend())
-            throw new IllegalArgumentException(teamData + " can not be sent");
-        // Try to send a team that is already assigned to another player
-        final String linkedPlayer = idPlayer.get(teamData.getId());
-        if (linkedPlayer != null && !playerName.equals(linkedPlayer)) {
-            throw new TeamIdException("The id '" + teamData.getId() + "' is already taken by the player '" + linkedPlayer + "'");
-        }
-        // The previous data does not exist -> Create a new one
-        if (previousData == null) {
-            data.put(playerName, teamData);
-            // Register the new id
-            idPlayer.put(teamData.getId(), playerName);
-            // If locked, does not send the packet
-            if (!locked) {
-                final Object packet;
-                try {
-                    packet = TeamPacketSender.getPacket(
-                            teamData,
-                            Collections.singletonList(playerName),
-                            TeamPacketSender.Method.CREATE
-                    );
-                } catch (ReflectiveOperationException exception) {
-                    throw new RuntimeException(exception);
+    public TeamData applyTeamData(Player player, TeamData teamData) {
+        synchronized (lock) {
+            Objects.requireNonNull(player);
+            final String playerName = player.getName();
+            final TeamData previousData = data.get(playerName);
+            // Try to send Null Data
+            if (teamData == null || teamData.isNull())
+                return previousData;
+            // Try to send a data with null id
+            if (!teamData.canSend())
+                throw new IllegalArgumentException(teamData + " can not be sent");
+            // Try to send a team that is already assigned to another player
+            final String linkedPlayer = idPlayer.get(teamData.getId());
+            if (linkedPlayer != null && !playerName.equals(linkedPlayer)) {
+                throw new TeamIdException("The id '" + teamData.getId() + "' is already taken by the player '" + linkedPlayer + "'");
+            }
+            // The previous data does not exist -> Create a new one
+            if (previousData == null) {
+                data.put(playerName, teamData);
+                // Register the new id
+                idPlayer.put(teamData.getId(), playerName);
+                // If locked, does not send the packet
+                if (!locked) {
+                    final Object packet;
+                    try {
+                        packet = TeamPacketSender.getPacket(
+                                teamData,
+                                Collections.singletonList(playerName),
+                                TeamPacketSender.Method.CREATE
+                        );
+                    } catch (ReflectiveOperationException exception) {
+                        throw new RuntimeException(exception);
+                    }
+                    taskManager.subscribeAll(packet);
                 }
-                taskManager.subscribeAll(packet);
+                return null;
             }
-            return null;
-        }
-        // The new data is exactly the same as the previous one -> Nothing to do
-        if (previousData.equals(teamData)) {
-            return previousData;
-        }
-        // Merge to actualize data
-        final TeamData conflictData = previousData.merge(teamData);
-        final boolean changeName = conflictData.canSend();
-        // Team change id -> Remove the old one
-        if (changeName) {
-            final String previousId = conflictData.getId();
-            final String removedPlayer = idPlayer.remove(previousId);
-            // Check if we remove the good player from id map for synchronisation warning
-            if (!playerName.equals(removedPlayer)) {
-                final String awkwardMessage = messages.getMessage("manager.awkward-remove",
-                        "%teamplayer%", "%idplayer%", "%teamid%",
-                        playerName, String.valueOf(removedPlayer), previousId
-                );
-                if (awkwardMessage != null)
-                    logger.log(Level.WARNING, awkwardMessage);
+            // The new data is exactly the same as the previous one -> Nothing to do
+            if (previousData.equals(teamData)) {
+                return previousData;
             }
-            // Register the new id
-            idPlayer.put(teamData.getId(), playerName);
+            // Merge to actualize data
+            final TeamData conflictData = previousData.merge(teamData);
+            final boolean changeName = conflictData.canSend();
+            // Team change id -> Remove the old one
+            if (changeName) {
+                final String previousId = conflictData.getId();
+                final String removedPlayer = idPlayer.remove(previousId);
+                // Check if we remove the good player from id map for synchronisation warning
+                if (!playerName.equals(removedPlayer)) {
+                    final String awkwardMessage = messages.getMessage("manager.awkward-remove",
+                            "%teamplayer%", "%idplayer%", "%teamid%",
+                            playerName, String.valueOf(removedPlayer), previousId
+                    );
+                    if (awkwardMessage != null)
+                        logger.log(Level.WARNING, awkwardMessage);
+                }
+                // Register the new id
+                idPlayer.put(teamData.getId(), playerName);
+                // Does not send the packet if the tab is locked
+                if (!locked) {
+                    removeTeam(conflictData.getId());
+                }
+            }
             // Does not send the packet if the tab is locked
-            if (!locked) {
-                removeTeam(conflictData.getId());
+            if (locked)
+                return conflictData;
+            final Object packet;
+            try {
+                packet = TeamPacketSender.getPacket(
+                        previousData,
+                        Collections.singletonList(playerName),
+                        changeName ? TeamPacketSender.Method.CREATE : TeamPacketSender.Method.UPDATE_INFO
+                );
+            } catch (ReflectiveOperationException exception) {
+                throw new RuntimeException(exception);
             }
-        }
-        // Does not send the packet if the tab is locked
-        if (locked)
+            taskManager.subscribeAll(packet);
             return conflictData;
-        final Object packet;
-        try {
-            packet = TeamPacketSender.getPacket(
-                    previousData,
-                    Collections.singletonList(playerName),
-                    changeName ? TeamPacketSender.Method.CREATE : TeamPacketSender.Method.UPDATE_INFO
-            );
-        } catch (ReflectiveOperationException exception) {
-            throw new RuntimeException(exception);
         }
-        taskManager.subscribeAll(packet);
-        return conflictData;
     }
 
     /**
@@ -380,23 +390,25 @@ public class TeamPacketManager implements Listener {
      * @return The data who is removed
      */
     public TeamData removeTeamData(String player) {
-        Objects.requireNonNull(player);
-        final TeamData teamData = data.remove(player);
-        if (teamData != null && teamData.canSend()) {
-            final String id = teamData.getId();
-            if (!locked) {
-                removeTeam(id);
+        synchronized (lock) {
+            Objects.requireNonNull(player);
+            final TeamData teamData = data.remove(player);
+            if (teamData != null && teamData.canSend()) {
+                final String id = teamData.getId();
+                if (!locked) {
+                    removeTeam(id);
+                }
+                final String removedPlayer = idPlayer.remove(id);
+                final String awkwardMessage = messages.getMessage("manager.awkward-remove",
+                        "%teamplayer%", "%idplayer%", "%teamid%",
+                        player, String.valueOf(removedPlayer), id
+                );
+                if (awkwardMessage != null && !player.equals(removedPlayer)) {
+                    logger.log(Level.WARNING, awkwardMessage);
+                }
             }
-            final String removedPlayer = idPlayer.remove(id);
-            final String awkwardMessage = messages.getMessage("manager.awkward-remove",
-                    "%teamplayer%", "%idplayer%", "%teamid%",
-                    player, String.valueOf(removedPlayer), id
-            );
-            if (awkwardMessage != null && !player.equals(removedPlayer)) {
-                logger.log(Level.WARNING, awkwardMessage);
-            }
+            return teamData;
         }
-        return teamData;
     }
 
     /**
@@ -425,8 +437,10 @@ public class TeamPacketManager implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR)
     private void onQuit(PlayerQuitEvent event) {
-        removeTeamData(event.getPlayer().getName());
-        taskManager.remove(event.getPlayer());
+        synchronized (lock) {
+            removeTeamData(event.getPlayer().getName());
+            taskManager.remove(event.getPlayer());
+        }
     }
 
     /**
@@ -436,22 +450,25 @@ public class TeamPacketManager implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR)
     private void onJoin(PlayerJoinEvent event) {
-        if (locked || data.isEmpty())
-            return;
-        final List<Object> packets = data.entrySet().stream()
-                .map(entry -> {
-                    try {
-                        return TeamPacketSender.getPacket(
-                                entry.getValue(),
-                                Collections.singletonList(entry.getKey()),
-                                TeamPacketSender.Method.CREATE
-                        );
-                    } catch (ReflectiveOperationException exception) {
-                        throw new RuntimeException(exception);
-                    }
-                })
-                .collect(Collectors.toList());
-        taskManager.subscribe(event.getPlayer(), packets);
+        synchronized (lock) {
+            if (locked || data.isEmpty())
+                return;
+            final List<Object> packets = data.entrySet().stream()
+                    .map(entry -> {
+                        try {
+                            return TeamPacketSender.getPacket(
+                                    entry.getValue(),
+                                    Collections.singletonList(entry.getKey()),
+                                    TeamPacketSender.Method.CREATE
+                            );
+                        } catch (ReflectiveOperationException exception) {
+                            throw new RuntimeException(exception);
+                        }
+                    })
+                    .collect(Collectors.toList());
+            taskManager.subscribe(event.getPlayer(), packets);
+        }
+
     }
 
 }
