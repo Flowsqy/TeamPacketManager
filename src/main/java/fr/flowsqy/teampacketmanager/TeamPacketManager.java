@@ -229,7 +229,10 @@ public class TeamPacketManager implements Listener {
                         throw new RuntimeException(exception);
                     }
                 }
-                idPlayer.remove(removeId);
+                final String player = idPlayer.remove(removeId);
+                if (player != null) {
+                    data.remove(player);
+                }
             }
 
             // Send packets
