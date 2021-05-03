@@ -99,7 +99,9 @@ public class TeamPacketManager implements Listener {
      */
     public TeamData get(Player player) {
         synchronized (lock) {
-            return applyTeamData(player, null);
+            if (player == null)
+                return null;
+            return data.get(player.getName());
         }
     }
 
