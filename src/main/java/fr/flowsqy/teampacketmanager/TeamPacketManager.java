@@ -6,6 +6,7 @@ import fr.flowsqy.teampacketmanager.exception.TeamIdException;
 import fr.flowsqy.teampacketmanager.io.Messages;
 import fr.flowsqy.teampacketmanager.task.TeamPacketTaskManager;
 import org.bukkit.Bukkit;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -393,24 +394,28 @@ public class TeamPacketManager implements Listener {
      */
     public TeamData removeTeamData(String player) {
         synchronized (lock) {
-            Objects.requireNonNull(player);
-            final TeamData teamData = data.remove(player);
-            if (teamData != null && teamData.canSend()) {
-                final String id = teamData.getId();
-                if (!locked) {
-                    removeTeam(id);
-                }
-                final String removedPlayer = idPlayer.remove(id);
-                final String awkwardMessage = messages.getMessage("manager.awkward-remove",
-                        "%teamplayer%", "%idplayer%", "%teamid%",
-                        player, String.valueOf(removedPlayer), id
-                );
-                if (awkwardMessage != null && !player.equals(removedPlayer)) {
-                    logger.log(Level.WARNING, awkwardMessage);
-                }
-            }
-            return teamData;
+            return removeTeamDataUnsafe(player);
         }
+    }
+
+    private TeamData removeTeamDataUnsafe(String player) {
+        Objects.requireNonNull(player);
+        final TeamData teamData = data.remove(player);
+        if (teamData != null && teamData.canSend()) {
+            final String id = teamData.getId();
+            if (!locked) {
+                removeTeam(id);
+            }
+            final String removedPlayer = idPlayer.remove(id);
+            final String awkwardMessage = messages.getMessage("manager.awkward-remove",
+                    "%teamplayer%", "%idplayer%", "%teamid%",
+                    player, String.valueOf(removedPlayer), id
+            );
+            if (awkwardMessage != null && !player.equals(removedPlayer)) {
+                logger.log(Level.WARNING, awkwardMessage);
+            }
+        }
+        return teamData;
     }
 
     /**
@@ -430,6 +435,17 @@ public class TeamPacketManager implements Listener {
             throw new RuntimeException(exception);
         }
         taskManager.subscribeAll(packet);
+    }
+
+    /**
+     * Clean data
+     */
+    public void cleanData() {
+        synchronized (lock) {
+            final Set<String> players = data.keySet();
+            Bukkit.getOnlinePlayers().stream().map(HumanEntity::getName).forEach(players::remove);
+            players.forEach(this::removeTeamDataUnsafe);
+        }
     }
 
     /**
